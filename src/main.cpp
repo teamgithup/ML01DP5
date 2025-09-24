@@ -32,16 +32,15 @@ DataPacket packet;  // biến toàn cục để gửi
 int intervals[] = {1000, 500, 250, 125};  // 1Hz, 2Hz, 4Hz, 8Hz
 int mode = 0;  // index tần suất
 unsigned long lastSend = 0;
-unsigned long lastDebounce = 0;
-bool ledState = false;
+
+volatile bool btnFlag = false;
+unsigned long lastBtnMs = 0;
+unsigned long ledPulseUntil = 0;
 
 void IRAM_ATTR handleButton() {
-  unsigned long now = millis();
-  if (now - lastDebounce > 200) {  // chống dội nút
-    mode = (mode + 1) % 4;         // chuyển vòng
-    lastDebounce = now;
-  }
+  btnFlag = true;
 }
+
 
 void setup() {
   Serial.begin(115200);
@@ -60,6 +59,12 @@ void setup() {
 
   // NRF24 init
   radio.begin();
+
+  if (!radio.begin()) {
+  Serial.println("NRF24 init failed!");
+  while (1); // dừng hẳn
+  }
+
   radio.openWritingPipe(ADDRESS);
   radio.setChannel(100);
   radio.setDataRate(RF24_250KBPS);
@@ -72,23 +77,31 @@ void setup() {
 
 void loop() {
   esp_task_wdt_reset();  // kick watchdog
-
   unsigned long now = millis();
+
+  // Xử lý debounce an toàn trong loop
+  if (btnFlag) {
+    if (now - lastBtnMs > 200) {
+      mode = (mode + 1) % 4;
+      lastBtnMs = now;
+    }
+    btnFlag = false;
+  }
+
+  // Gửi dữ liệu định kỳ
   if (now - lastSend >= intervals[mode]) {
     lastSend = now;
-
-    // Gán dữ liệu vào struct
-    packet.VD1 = random(0, 1024);  // ví dụ giá trị VD1
-    packet.VD2 = random(0, 1024);  // ví dụ giá trị VD2
-
-    // Gửi gói struct (4 byte)
+    packet.VD1 = random(0, 1024);
+    packet.VD2 = random(0, 1024);
     bool ok = radio.write(&packet, sizeof(packet));
     Serial.print("Send: VD1="); Serial.print(packet.VD1);
     Serial.print(" VD2="); Serial.print(packet.VD2);
     Serial.print(" -> "); Serial.println(ok ? "OK" : "Fail");
 
-    // LED nháy minh họa
-    ledState = !ledState;
-    ledcWrite(0, ledState ? 255 : 0);
+    ledPulseUntil = now + 50;  // bật LED trong 50 ms
   }
+
+  // LED pulse (non-blocking)
+  if (now < ledPulseUntil) ledcWrite(0, 255);
+  else ledcWrite(0, 0);
 }
