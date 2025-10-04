@@ -4,8 +4,8 @@
 #include <esp_task_wdt.h>  // Watchdog
 
 // Chân NRF24L01 (bạn thay theo wiring)
-#define CE_PIN   5
-#define CSN_PIN  17
+#define CE_PIN   13
+#define CSN_PIN  12
 
 // Chân LED + Nút
 #define LED_PIN  2
@@ -31,11 +31,11 @@ DataPacket packet;  // biến toàn cục để gửi
 // Các tần suất gửi (ms)
 int intervals[] = {1000, 500, 250, 125};  // 1Hz, 2Hz, 4Hz, 8Hz
 int mode = 0;  // index tần suất
-unsigned long lastSend = 0;
+unsigned long lastSend = 0; // lưu thời điểm lần cuối gửi.
 
-volatile bool btnFlag = false;
-unsigned long lastBtnMs = 0;
-unsigned long ledPulseUntil = 0;
+volatile bool btnFlag = false; //cờ báo khi được nhấn nút
+unsigned long lastBtnMs = 0; // thời điểm ấn nút gần nhất
+unsigned long ledPulseUntil = 0; 
 
 void IRAM_ATTR handleButton() {
   btnFlag = true;
